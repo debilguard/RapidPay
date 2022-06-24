@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RapidPay.Services.Interfaces;
@@ -28,32 +28,26 @@ namespace RapidPay.Authentication
         }
 
         protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
-        {
-            string username = null;
-            try
-            {
-                var authHeader = AuthenticationHeaderValue.Parse(Request.Headers["Authorization"]);
-                var credentials = Encoding.UTF8.GetString(Convert.FromBase64String(authHeader.Parameter)).Split(':');
-                username = credentials.FirstOrDefault();
-                var password = credentials.LastOrDefault();
+        {  
+           if(Request.Headers["Authorization"].SingleOrDefault() is null)
+                return AuthenticateResult.Fail($"Authentication failed invalid username or password");
 
-                if (! await _userService.IsAuthenticated(username, password))
-                    throw new ArgumentException("Invalid credentials");
-            }
-            catch (Exception ex)
-            {
-                return AuthenticateResult.Fail($"Authentication failed: {ex.Message}");
-            }
+            var basicAuthInfo = AuthenticationHeaderValue.Parse(Request.Headers["Authorization"]);
+            var credentials = Encoding.UTF8.GetString(Convert.FromBase64String(basicAuthInfo.Parameter)).Split(':');
+            var username = credentials[0];
+            var password = credentials[1];
 
-            var claims = new[] 
-            {
-                new Claim(ClaimTypes.Name, username)
-            };
+            if (!await _userService.IsAuthenticated(username, password))
+                return AuthenticateResult.Fail($"Authentication failed invalid username or password");
+
+            var claims = new[]
+                {
+                    new Claim(ClaimTypes.Name, username)
+                };
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             var principal = new ClaimsPrincipal(identity);
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
-
-            return AuthenticateResult.Success(ticket);
+            return AuthenticateResult.Success(ticket); 
         }
     }
 }
